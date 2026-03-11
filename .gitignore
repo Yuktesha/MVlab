@@ -1,0 +1,23 @@
+.venv/
+__pycache__/
+*.pyc
+.vscode/
+node_modules/
+build/
+dist/
+*.log
+.DS_Store
+
+# Ignore large media/project files
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.cdr
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.wav
+*.mp3
+QMotion/material/

@@ -1,0 +1,14 @@
+{
+    "geometry": "1391x1360+577+0",
+    "trim_frames": 0,
+    "mode": "standard",
+    "crossfade": false,
+    "xfade_dur": 0.1,
+    "keep_audio": true,
+    "last_dir": "C:/_MyData/_fhd",
+    "sort_col": "name",
+    "sort_desc": false,
+    "config_signature": "film_stitch_v1",
+    "ui_scale": 1.0,
+    "maximized": false
+}
