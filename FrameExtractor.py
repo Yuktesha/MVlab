@@ -1,13 +1,18 @@
+import os
+import sys
+# Add parent directory to sys.path so we can import the shared _lib
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import subprocess
 import threading
-import os
 import time
 from pathlib import Path
 import shutil
 import _lib.UniversalUI as UniversalUI
-import sys
 import re
 
 # Try importing TkinterDnD

@@ -284,6 +284,27 @@ class UniversalApp:
         self.root.bind("<Control-equal>", self.increase_scale)
         self.root.bind("<Control-minus>", self.decrease_scale)
         self.root.bind("<Control-0>", self.reset_scale)
+        self.root.bind("<Control-t>", self.toggle_theme)
+        self.root.bind("<Control-T>", self.toggle_theme)
+
+    def toggle_theme(self, event=None):
+        """Toggles between Dark and Light mode."""
+        current = self.config.get("theme", "system")
+        if current == "dark":
+            new_mode = "light"
+        elif current == "light":
+            new_mode = "system" # Back to system or switch to dark? Let's cycle dark -> light -> system
+        else:
+            new_mode = "dark"
+            
+        self.config.set("theme", new_mode)
+        self.setup_theme()
+        
+        # Show a Toast to notify user
+        mode_label = new_mode.capitalize()
+        if new_mode == "system":
+            mode_label = f"System ({get_system_theme().capitalize()})"
+        self.show_toast(f"Theme switched to {mode_label}", level="info")
 
     def open_settings(self):
         """Opens the generic Universal Settings Dialog."""
@@ -513,6 +534,10 @@ class UniversalApp:
         self.config.save()
         self.root.destroy()
 
+    def show_toast(self, message, level="info", duration=3000):
+        """Shows a modern non-blocking notification."""
+        UniversalToast(self.root, message, level, duration)
+
 
 def get_ffmpeg_exe():
     cwd_path = Path.cwd() / "ffmpeg.exe"
@@ -540,73 +565,185 @@ class DraggableTreeHelper:
         self.on_drop_callback = on_drop_callback
         
         # State
-        self._drag_data = {"item": None, "y": 0, "ghost": None}
+        self._drag_data = {"items": [], "y": 0, "ghost": None, "last_target_id": None, "auto_scroll_id": None}
         
+        # Configure drop_target style tag based on current theme
+        try:
+            self.tree.tag_configure("drop_target", background="#007acc", foreground="white")
+        except:
+            pass
+            
         # Bindings
         self.tree.bind("<ButtonPress-1>", self.on_drag_start, add='+')
         self.tree.bind("<B1-Motion>", self.on_drag_motion, add='+')
         self.tree.bind("<ButtonRelease-1>", self.on_drag_release, add='+')
 
     def on_drag_start(self, event):
-        # Only handle if clicked on a row
+        # Only record coordinate, let Tkinter handle default selection first
         item = self.tree.identify_row(event.y)
         if item:
-            self._drag_data["item"] = item
-            self._drag_data["y"] = event.y
+            self._drag_data["start_item"] = item
+            self._drag_data["start_y"] = event.y
+            self._drag_data["start_x"] = event.x
+            self._drag_data["active"] = False
+            self._drag_data["last_target_id"] = None
             
-            # Create Ghost Window (Lego Block!)
-            vals = self.tree.item(item, "values")
-            # Construct a preview text. Ideally just show first column or joined
-            txt = " | ".join(str(v) for v in vals if v)
-            if len(txt) > 50: txt = txt[:47] + "..."
+            # Check modifiers
+            is_ctrl = (event.state & 0x0004) != 0
+            is_shift = (event.state & 0x0001) != 0
             
-            ghost = tk.Toplevel(self.root)
-            ghost.overrideredirect(True)
-            ghost.attributes("-alpha", 0.6) # Semi-transparent
-            ghost.attributes("-topmost", True)
-            
-            # Try to match theme colors if accessible, else default blue
-            bg = "#4a90e2"
-            fg = "white"
-            
-            lbl = tk.Label(ghost, text=txt, bg=bg, fg=fg, padx=10, pady=5, relief="solid", borderwidth=1)
-            lbl.pack()
-            
-            self._drag_data["ghost"] = ghost
-            
-            # Change cursor
-            self.tree.configure(cursor="hand2")
+            if item in self.tree.selection() and not is_ctrl and not is_shift:
+                # If clicking on an already selected item, save the full selection and prevent default click
+                self._drag_data["items"] = list(self.tree.selection())
+                return "break"
+            else:
+                self._drag_data["items"] = []
 
     def on_drag_motion(self, event):
-        if not self._drag_data["item"]: return
+        start_item = self._drag_data.get("start_item")
+        if not start_item: return
         
-        # Move Ghost
-        ghost = self._drag_data["ghost"]
-        if ghost:
-            # Shift slightly so it doesn't cover exact cursor
-            ghost.geometry(f"+{event.x_root + 15}+{event.y_root + 10}")
+        # Check if dragging threshold is met
+        if not self._drag_data.get("active"):
+            dx = abs(event.x - self._drag_data["start_x"])
+            dy = abs(event.y - self._drag_data["start_y"])
+            if dx > 5 or dy > 5:
+                self._drag_data["active"] = True
+                
+                # Get current selection
+                if not self._drag_data.get("items"):
+                    selected = list(self.tree.selection())
+                    if start_item not in selected:
+                        self.tree.selection_set(start_item)
+                        selected = [start_item]
+                    self._drag_data["items"] = selected
+                else:
+                    selected = self._drag_data["items"]
+                
+                # Create ghost
+                count = len(selected)
+                if count == 1:
+                    vals = self.tree.item(start_item, "values")
+                    txt = " | ".join(str(v) for v in vals if v)
+                    if len(txt) > 50: txt = txt[:47] + "..."
+                else:
+                    txt = f"📦 已選取 {count} 個項目"
+                
+                ghost = tk.Toplevel(self.root)
+                ghost.overrideredirect(True)
+                ghost.attributes("-alpha", 0.7)
+                ghost.attributes("-topmost", True)
+                
+                bg = "#4a90e2"
+                fg = "white"
+                
+                lbl = tk.Label(ghost, text=txt, bg=bg, fg=fg, padx=10, pady=5, relief="solid", borderwidth=1)
+                lbl.pack()
+                
+                self._drag_data["ghost"] = ghost
+                self.tree.configure(cursor="hand2")
+
+        if self._drag_data.get("active"):
+            # Move Ghost
+            ghost = self._drag_data["ghost"]
+            if ghost:
+                ghost.geometry(f"+{event.x_root + 15}+{event.y_root + 10}")
+                
+            target_id = self.tree.identify_row(event.y)
             
-        # Highlight Target logic
-        target_id = self.tree.identify_row(event.y)
-        if target_id:
-             self.tree.selection_set(target_id)
+            # Clear old drop target tags
+            for item in self.tree.get_children():
+                tags = list(self.tree.item(item, "tags") or [])
+                if "drop_target" in tags:
+                    tags.remove("drop_target")
+                    self.tree.item(item, tags=tags)
+                    
+            if target_id and target_id not in self._drag_data["items"]:
+                self._drag_data["last_target_id"] = target_id
+                tags = list(self.tree.item(target_id, "tags") or [])
+                if "drop_target" not in tags:
+                    tags.append("drop_target")
+                    self.tree.item(target_id, tags=tags)
+
+            # Auto-scroll logic
+            self._drag_data["last_y"] = event.y
+            tree_h = self.tree.winfo_height()
+            margin = 30
+            if event.y < margin:
+                self._start_auto_scroll(-1)
+            elif event.y > tree_h - margin:
+                self._start_auto_scroll(1)
+            else:
+                self._stop_auto_scroll()
 
     def on_drag_release(self, event):
-        # Clean up Visuals
-        if self._drag_data["ghost"]:
+        # Clear drop target tags
+        for item in self.tree.get_children():
+            tags = list(self.tree.item(item, "tags") or [])
+            if "drop_target" in tags:
+                tags.remove("drop_target")
+                self.tree.item(item, tags=tags)
+
+        if self._drag_data.get("ghost"):
             self._drag_data["ghost"].destroy()
             self._drag_data["ghost"] = None
         self.tree.configure(cursor="")
         
-        source_id = self._drag_data["item"]
-        if not source_id: return
-
-        self._drag_data["item"] = None
+        self._stop_auto_scroll()
         
-        target_id = self.tree.identify_row(event.y)
-        if target_id and target_id != source_id:
+        if not self._drag_data.get("active"):
+            start_item = self._drag_data.get("start_item")
+            if start_item and self._drag_data.get("items"):
+                self.tree.selection_set(start_item)
+            self._drag_data = {"items": [], "y": 0, "ghost": None, "last_target_id": None, "auto_scroll_id": None}
+            return
+            
+        source_ids = self._drag_data["items"]
+        target_id = self._drag_data.get("last_target_id")
+        
+        self._drag_data = {"items": [], "y": 0, "ghost": None, "last_target_id": None, "auto_scroll_id": None}
+        
+        if target_id and target_id not in source_ids:
             if self.on_drop_callback:
-                self.on_drop_callback(source_id, target_id)
+                self.on_drop_callback(source_ids, target_id)
+
+    def _start_auto_scroll(self, direction):
+        if self._drag_data.get("auto_scroll_dir") == direction:
+            return
+        self._drag_data["auto_scroll_dir"] = direction
+        self._auto_scroll_loop()
+
+    def _stop_auto_scroll(self):
+        self._drag_data["auto_scroll_dir"] = 0
+        if self._drag_data.get("auto_scroll_id"):
+            self.root.after_cancel(self._drag_data["auto_scroll_id"])
+            self._drag_data["auto_scroll_id"] = None
+
+    def _auto_scroll_loop(self):
+        direction = self._drag_data.get("auto_scroll_dir", 0)
+        if direction == 0:
+            return
+        
+        self.tree.yview_scroll(direction, "units")
+        
+        # Update target_id since items have moved
+        last_y = self._drag_data.get("last_y")
+        if last_y is not None:
+            target_id = self.tree.identify_row(last_y)
+            for item in self.tree.get_children():
+                tags = list(self.tree.item(item, "tags") or [])
+                if "drop_target" in tags:
+                    tags.remove("drop_target")
+                    self.tree.item(item, tags=tags)
+                    
+            if target_id and target_id not in self._drag_data.get("items", []):
+                self._drag_data["last_target_id"] = target_id
+                tags = list(self.tree.item(target_id, "tags") or [])
+                if "drop_target" not in tags:
+                    tags.append("drop_target")
+                    self.tree.item(target_id, tags=tags)
+                    
+        self._drag_data["auto_scroll_id"] = self.root.after(50, self._auto_scroll_loop)
 
 class UndoManager:
     """
@@ -797,12 +934,121 @@ class UniversalSettingsDialog:
                 # Better safe than sorry, ignore error or warn.
                 print(f"Failed to convert {k} to {t_type}")
                 pass
-                
-        self.config.save()
-        if self.on_save_callback:
-            self.on_save_callback()
+
+
+class ResponsiveFrame(ttk.Frame):
+    """
+    A Frame that automatically switches its layout from horizontal (row) to vertical (stack)
+    when its width falls below a certain threshold.
+    """
+    def __init__(self, parent, threshold=400, padding=5, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.threshold = threshold
+        self.padding = padding
+        self._is_stacked = False
+        self._widgets = []
+        
+        self.bind("<Configure>", self._on_resize)
+
+    def add_widget(self, widget_class, **kwargs):
+        """Creates and adds a widget to this frame."""
+        w = widget_class(self, **kwargs)
+        self._widgets.append(w)
+        self._re_layout()
+        return w
+
+    def add_existing(self, widget):
+        """Adds an existing widget to managed list."""
+        widget.master = self # Warning: master change in TK is tricky
+        self._widgets.append(widget)
+        self._re_layout()
+
+    def _on_resize(self, event):
+        should_stack = event.width < self.threshold
+        if should_stack != self._is_stacked:
+            self._is_stacked = should_stack
+            self._re_layout()
+
+    def _re_layout(self):
+        for w in self._widgets:
+            w.pack_forget()
+        
+        for w in self._widgets:
+            if self._is_stacked:
+                w.pack(side="top", fill="x", padx=self.padding, pady=self.padding)
+            else:
+                w.pack(side="left", fill="both", expand=True, padx=self.padding, pady=self.padding)
+
+
+class UniversalToast(tk.Toplevel):
+    """
+    A non-blocking 'Toast' notification window.
+    """
+    def __init__(self, parent, message, level="info", duration=3000):
+        super().__init__(parent)
+        self.overrideredirect(True)
+        self.attributes("-topmost", True)
+        self.attributes("-alpha", 0.0) # Start invisible for fade-in
+        
+        # Colors based on level
+        colors = {
+            "info": ("#007acc", "white"),
+            "success": ("#28a745", "white"),
+            "warning": ("#ffc107", "black"),
+            "error": ("#dc3545", "white")
+        }
+        bg, fg = colors.get(level, colors["info"])
+        
+        self.configure(bg=bg)
+        
+        # Icon (Simulated with emoji for now)
+        icons = {"info": "ℹ️", "success": "✅", "warning": "⚠️", "error": "❌"}
+        icon = icons.get(level, "🔔")
+        
+        lbl = tk.Label(self, text=f"{icon} {message}", bg=bg, fg=fg, 
+                       padx=20, pady=10, font=("Microsoft JhengHei UI", 10, "bold"))
+        lbl.pack()
+        
+        self.update_idletasks()
+        
+        # Position: Bottom Right of parent or screen
+        try:
+            px = parent.winfo_rootx()
+            py = parent.winfo_rooty()
+            pw = parent.winfo_width()
+            ph = parent.winfo_height()
             
-        self.win.destroy()
+            x = px + pw - self.winfo_width() - 20
+            y = py + ph - self.winfo_height() - 20
+        except:
+            # Fallback to screen bottom right
+            sw = self.winfo_screenwidth()
+            sh = self.winfo_screenheight()
+            x = sw - self.winfo_width() - 20
+            y = sh - self.winfo_height() - 60
+            
+        self.geometry(f"+{x}+{y}")
+        
+        # Fade In
+        self._fade_in()
+        
+        # Auto Close
+        self.after(duration, self._fade_out)
+
+    def _fade_in(self):
+        alpha = self.attributes("-alpha")
+        if alpha < 0.95:
+            self.attributes("-alpha", alpha + 0.1)
+            self.after(20, self._fade_in)
+
+    def _fade_out(self):
+        alpha = self.attributes("-alpha")
+        if alpha > 0.05:
+            self.attributes("-alpha", alpha - 0.1)
+            self.after(20, self._fade_out)
+        else:
+            self.destroy()
+                
 class UniversalTreeview(ttk.Treeview):
     """
     A pre-configured Treeview with:
@@ -821,13 +1067,14 @@ class UniversalTreeview(ttk.Treeview):
             self.heading(col, text=col, command=lambda c=col: self.sort_by(c, False))
             self.column(col, width=100) # Default width, can be overridden
             
-        # Drag & Drop
-        if self.draggable:
-            self.drag_helper = DraggableTreeHelper(self, self.on_drag_drop_complete)
-            
         # Alternating Colors (Try to get from style or hardcode decent dark defaults)
         self.tag_configure('odd', background='#252526')
         self.tag_configure('even', background='#1e1e1e')
+
+        # Drag & Drop
+        if self.draggable:
+            self.drag_helper = DraggableTreeHelper(self, self.on_drag_drop_complete)
+
         
     def sort_by(self, col, descending):
         """Sort tree contents when a column header is clicked."""
@@ -861,15 +1108,16 @@ class UniversalTreeview(ttk.Treeview):
         
         self.refresh_stripes()
 
-    def on_drag_drop_complete(self, source_id, target_id):
+    def on_drag_drop_complete(self, source_ids, target_id):
         """Called by DraggableTreeHelper when a drop happens."""
         # Default behavior: Move source to index of target
-        if source_id == target_id: return
+        if not source_ids or target_id in source_ids: return
         
         try:
             # We want to drop insert "before" the target usually
             target_index = self.index(target_id)
-            self.move(source_id, '', target_index)
+            for i, sid in enumerate(source_ids):
+                self.move(sid, '', target_index + i)
             self.refresh_stripes()
         except: pass
         

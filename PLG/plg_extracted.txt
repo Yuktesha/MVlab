@@ -1,0 +1,44 @@
+PLG (Play List Generator)
+一個命令列為主、GUI為輔的播放清單生成器
+基本行為：
+無參數時啟動GUI介面
+無參數時啟動GUI介面
+有參數且含參數 /G 時，以GUI介面帶進成果給使用者確認
+有參數且含參數 /G 時，以GUI介面帶進成果給使用者確認
+有參數但無參數 /G 時，以參數生成指定格式播放清單
+有參數但無參數 /G 時，以參數生成指定格式播放清單
+未指定播放清單格式時，預設為 xspf 格式。
+未指定播放清單格式時，預設為 xspf 格式。
+命令基本語法：
+plg (Source)[drive:][path] [file type] [/S] [/O[[:]sortorder]] (Target)[drive:][path][filename] [/F[[:]fileformat]] [/B] [/L[:]hh:mm:ss,容許誤差範圍+/-hh:mm:ss] [/N[:]歌曲數量N,容許誤差範圍+/-n] [/U]
+
+/O List by files in sorted order.
+Sortorder
+N By file name (alphabetic)
+S By file size (smallest first)
+E By file extension (alphabetic)
+D By file date/time (newest first)
+G Group directories first
+A By artist
+TT By title
+TK By track name
+TN By track number
+- Prefix to reverse order
+
+/S Include subdirectories.
+
+/B 如檔案格式支援，以命令被啟動的資料夾中的媒體檔案之相對路徑生成播放清單內容。未使用本參數時，預設為完整路徑。
+
+/F 支援M3U8、PLS、XSPF、WPL
+/L 指定總長度及容許誤差範圍
+/N 指定播放媒體總數量及容許誤差範圍
+/U 依啟動資料夾中所有播放清單中備註所用參數更新清單
+
+當同時指定 /F（指定格式）與 /L（總長度限制）參數，且來源媒體檔案總量足以實作為多組播放清單時，程式應自動啟用多組切分模式。
+命名規則：自動以使用者指定的目標檔名後方附加 [-NNN] 流水號形式生成（例如：折返點[-001].xspf、折返點[-002].xspf。去重機制：已被選入前一張清單的檔案，不得重複出現在後續的清單中，確保每組清單內容完全不同。殘餘處理：若最後剩餘的檔案總長度不足 /L 的誤差範圍，仍應將剩餘檔案生成最後一組清單，不予捨棄。
+命名規則：自動以使用者指定的目標檔名後方附加 [-NNN] 流水號形式生成（例如：折返點[-001].xspf、折返點[-002].xspf。
+命名規則：自動以使用者指定的目標檔名後方附加 [-NNN] 流水號形式生成（例如：折返點[-001].xspf、折返點[-002].xspf。
+去重機制：已被選入前一張清單的檔案，不得重複出現在後續的清單中，確保每組清單內容完全不同。
+去重機制：已被選入前一張清單的檔案，不得重複出現在後續的清單中，確保每組清單內容完全不同。
+殘餘處理：若最後剩餘的檔案總長度不足 /L 的誤差範圍，仍應將剩餘檔案生成最後一組清單，不予捨棄。
+殘餘處理：若最後剩餘的檔案總長度不足 /L 的誤差範圍，仍應將剩餘檔案生成最後一組清單，不予捨棄。

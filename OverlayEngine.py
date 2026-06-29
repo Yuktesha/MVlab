@@ -1,7 +1,12 @@
+import os
+import sys
+# Add parent directory to sys.path so we can import the shared _lib
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, colorchooser
-import sys
-import os
 import json
 import subprocess
 import shutil
@@ -389,6 +394,7 @@ class OverlayApp(UniversalApp):
         var_dur = tk.StringVar(value="5.0")
         ttk.Entry(r3, textvariable=var_dur, width=5).pack(side="left")
         
+        r4 = ttk.Frame(dlg); r4.pack(fill="x", padx=10, pady=5)
         ttk.Label(r4, text="Anim In:").pack(side="left")
         var_anim = tk.StringVar(value="fade")
         anims = ["none", "fade", "slide_left", "slide_right", "slide_up", "slide_down", "scroll_up"]

@@ -1,10 +1,11 @@
 {
-    "geometry": "1278x1360+-7+0",
+    "geometry": "1278x1360+-14+0",
     "upscale_mode": "1080p",
     "name_source": "audio",
-    "last_dir": "",
+    "last_dir": "C:/Users/Yuktesha/Desktop",
     "undo_limit": 32,
     "config_signature": "chrono_stretch_v1",
     "ui_scale": 1.0,
-    "maximized": false
+    "maximized": false,
+    "_settings_geometry": "442x500+1072+430"
 }
