@@ -116,7 +116,7 @@ def check_association_in_registry(ext):
         try:
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path) as key:
                 val, _ = winreg.QueryValueEx(key, "")
-                if script_name in val.lower():
+                if script_path.lower() in val.lower():
                     return True
         except FileNotFoundError:
             continue
