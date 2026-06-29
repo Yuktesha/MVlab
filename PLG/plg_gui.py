@@ -6,7 +6,8 @@ import threading
 import winreg
 
 # Add parent directory to sys.path so we can import the shared _lib
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Since this file is in MVlab/PLG, the root is 3 levels up
+parent_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
